@@ -1,0 +1,67 @@
+# ---> Go
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Go build cache and modules
+/go.sum
+/go.work
+/go.work.sum
+
+# Dependency directories
+vendor/
+
+# Go workspace
+bin/
+pkg/
+dist/
+
+# ---> Environment files
+.env
+.env.local
+.env.*
+!.env.example
+
+# ---> Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+*.old
+
+# ---> IDE and editor settings
+.vscode/
+.idea/
+*.iml
+
+# ---> OS generated files
+.DS_Store
+Thumbs.db
+
+# ---> Docker files (optional)
+# Uncomment if you use Docker and want to ignore build artifacts
+ docker-compose.override.yml
+ **/docker-compose.override.yml
+ **/Dockerfile.local
+
+# ---> Test and coverage reports
+coverage/
+*.coverprofile
+*.lcov
+
+# ---> Custom Project Artifacts
+# Ignore build outputs (e.g., from `go build -o bin/`)
+/build/
+/output/
+/tmp/
+

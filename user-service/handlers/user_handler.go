@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"ecommerce/shared/models"
-	"ecommerce/user-service/service"
+	"github.com/0lawale/shared/models"
+	"github.com/0lawale/user-service/service"
 )
 
 // UserHandler handles HTTP requests for users

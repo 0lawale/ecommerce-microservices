@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 
-	"ecommerce/shared/models"
+	"github.com/0lawale/shared/models"
 )
 
 // UserRepository handles database operations for users

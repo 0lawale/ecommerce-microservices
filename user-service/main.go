@@ -12,11 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"ecommerce/shared/config"
-	"ecommerce/shared/logger"
-	"ecommerce/user-service/handlers"
-	"ecommerce/user-service/repository"
-	"ecommerce/user-service/service"
+	"github.com/0lawale/shared/config"
+	"github.com/0lawale/shared/logger"
+	"github.com/0lawale/user-service/handlers"
+	"github.com/0lawale/user-service/repository"
+	"github.com/0lawale/user-service/service"
 )
 
 func main() {

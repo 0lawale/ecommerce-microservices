@@ -12,16 +12,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"ecommerce/order-service/handlers"
+	"ecommerce/order-service/messaging"
+	"ecommerce/order-service/repository"
+	"ecommerce/order-service/service"
 	"ecommerce/shared/config"
 	"ecommerce/shared/logger"
-	"ecommerce/user-service/handlers"
-	"ecommerce/user-service/repository"
-	"ecommerce/user-service/service"
 )
 
 func main() {
-	// 1. Load configuration from environment variables
-	cfg := config.LoadConfig("user-service")
+	// 1. Load configuration
+	cfg := config.LoadConfig("order-service")
 
 	// 2. Initialize logger
 	log, err := logger.NewLogger(cfg.ServiceName, cfg.IsDevelopment())
@@ -30,12 +31,12 @@ func main() {
 	}
 	defer log.Sync()
 
-	log.Info("Starting User Service",
+	log.Info("Starting Order Service",
 		zap.String("environment", cfg.Environment),
 		zap.String("port", cfg.Port),
 	)
 
-	// 3. Initialize database connection
+	// 3. Initialize database
 	db, err := repository.NewPostgresDB(cfg.GetDatabaseURL())
 	if err != nil {
 		log.Fatal("Failed to connect to database", zap.Error(err))
@@ -44,38 +45,56 @@ func main() {
 
 	log.Info("Database connection established")
 
-	// 4. Run database migrations (create tables if they don't exist)
+	// 4. Run migrations
 	if err := repository.RunMigrations(db); err != nil {
 		log.Fatal("Failed to run migrations", zap.Error(err))
 	}
 
-	// 5. Initialize Redis for caching
+	// 5. Initialize Redis
 	redisClient := repository.NewRedisClient(cfg.GetRedisURL(), cfg.RedisPassword)
 	defer redisClient.Close()
 
 	log.Info("Redis connection established")
 
-	// 6. Initialize layers: Repository -> Service -> Handler
-	userRepo := repository.NewUserRepository(db, redisClient)
-	userService := service.NewUserService(userRepo, cfg.JWTSecret)
-	userHandler := handlers.NewUserHandler(userService, log.Logger)
+	// 6. Initialize RabbitMQ publisher
+	publisher, err := messaging.NewRabbitMQPublisher(cfg.RabbitMQURL, log.Logger)
+	if err != nil {
+		log.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
+	}
+	defer publisher.Close()
 
-	// 7. Set up HTTP router (Gin framework)
+	log.Info("RabbitMQ connection established")
+
+	// 7. Initialize HTTP clients for inter-service communication
+	userServiceClient := service.NewHTTPClient(cfg.UserServiceURL, 10*time.Second)
+	productServiceClient := service.NewHTTPClient(cfg.ProductServiceURL, 10*time.Second)
+
+	// 8. Initialize layers
+	orderRepo := repository.NewOrderRepository(db, redisClient)
+	orderService := service.NewOrderService(
+		orderRepo,
+		userServiceClient,
+		productServiceClient,
+		publisher,
+		log.Logger,
+	)
+	orderHandler := handlers.NewOrderHandler(orderService, log.Logger)
+
+	// 9. Set up router
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.Default()
 
-	// 8. Register routes
-	setupRoutes(router, userHandler)
+	// 10. Register routes
+	setupRoutes(router, orderHandler)
 
-	// 9. Start HTTP server with graceful shutdown
+	// 11. Start server
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: router,
 	}
 
-	// Run server in a goroutine
 	go func() {
 		log.Info("Server listening", zap.String("address", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -83,14 +102,13 @@ func main() {
 		}
 	}()
 
-	// 10. Wait for interrupt signal for graceful shutdown
+	// 12. Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Info("Shutting down server...")
 
-	// Give outstanding requests 5 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -101,37 +119,23 @@ func main() {
 	log.Info("Server exited")
 }
 
-// setupRoutes configures all HTTP endpoints
-func setupRoutes(router *gin.Engine, handler *handlers.UserHandler) {
-	// Health check endpoint (Kubernetes uses this for liveness/readiness probes)
+func setupRoutes(router *gin.Engine, handler *handlers.OrderHandler) {
+	// Health checks
 	router.GET("/health", handler.HealthCheck)
 	router.GET("/ready", handler.ReadinessCheck)
 
 	// API routes
 	v1 := router.Group("/api/v1")
 	{
-		// Public routes (no authentication required)
-		auth := v1.Group("/auth")
+		orders := v1.Group("/orders")
 		{
-			auth.POST("/register", handler.Register)
-			auth.POST("/login", handler.Login)
-		}
-
-		// Protected routes (require JWT token)
-		users := v1.Group("/users")
-		users.Use(handlers.AuthMiddleware(handler))
-		{
-			users.GET("/me", handler.GetCurrentUser)
-			users.PUT("/me", handler.UpdateProfile)
-			users.GET("/:id", handler.GetUserByID)
-		}
-
-		// Admin-only routes
-		admin := v1.Group("/admin")
-		admin.Use(handlers.AuthMiddleware(handler), handlers.AdminMiddleware())
-		{
-			admin.GET("/users", handler.ListUsers)
-			admin.DELETE("/users/:id", handler.DeleteUser)
+			// All order endpoints require authentication
+			// In production, add AuthMiddleware here
+			orders.POST("", handler.CreateOrder)              // Create new order
+			orders.GET("", handler.ListUserOrders)            // Get user's orders
+			orders.GET("/:id", handler.GetOrderByID)          // Get single order
+			orders.PUT("/:id/cancel", handler.CancelOrder)    // Cancel order
+			orders.GET("/:id/status", handler.GetOrderStatus) // Get order status
 		}
 	}
 }

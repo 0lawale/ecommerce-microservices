@@ -1,0 +1,14 @@
+.git
+.gitignore
+*.md
+README.md
+.env
+.vscode
+.idea
+*.log
+bin/
+tmp/
+vendor/
+node_modules/
+.DS_Store
+Thumbs.db

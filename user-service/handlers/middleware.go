@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/0lawale/shared/models"
+	"ecommerce/shared/models"
 )
 
 // AuthMiddleware validates JWT token and sets user in context

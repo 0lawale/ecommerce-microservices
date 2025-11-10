@@ -9,8 +9,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/0lawale/shared/models"
-	"github.com/0lawale/user-service/repository"
+	"ecommerce/shared/models"
+	"ecommerce/user-service/repository"
 )
 
 var (

@@ -63,18 +63,23 @@ pipeline {
                     go mod download
                     
                     echo "Building user-service..."
+                    go mod tidy
                     go build -o bin/user-service ./user-service
                     
                     echo "Building product-service..."
+                    go mod tidy
                     go build -o bin/product-service ./product-service
                     
                     echo "Building order-service..."
+                    go mod tidy
                     go build -o bin/order-service ./order-service
                     
                     echo "Building notification-service..."
+                    go mod tidy
                     go build -o bin/notification-service ./notification-service
                     
                     echo "Building api-gateway..."
+                    go mod tidy
                     go build -o bin/api-gateway ./api-gateway
                     
                     echo "✅ All services built successfully!"

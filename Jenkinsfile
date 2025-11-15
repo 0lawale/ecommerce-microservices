@@ -2,18 +2,18 @@ pipeline {
     agent any
     
     environment {
-        // Docker Hub credentials (we'll add these in Jenkins)
+        // Docker Hub credentials
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
         
-        // Image names
+        // Image names (replace with your Docker Hub username)
         USER_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/user-service"
         PRODUCT_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/product-service"
         ORDER_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/order-service"
         NOTIFICATION_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/notification-service"
         API_GATEWAY_IMAGE = "${DOCKER_REGISTRY}/0lawale/api-gateway"
         
-        // Build version (using build number and git commit)
+        // Build version
         VERSION = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
     }
     
@@ -29,11 +29,22 @@ pipeline {
             steps {
                 echo '🔍 Environment Information:'
                 sh '''
+                    # Set Go paths explicitly
+                    export PATH=/usr/local/go/bin:/usr/bin:$PATH
+                    export GOROOT=/usr/local/go
+                    export GOPATH=${WORKSPACE}/go
+                    
+                    echo "PATH: $PATH"
+                    echo "GOROOT: $GOROOT"
+                    echo "GOPATH: $GOPATH"
+                    echo ""
                     echo "Go version:"
                     go version
-                    echo "\nDocker version:"
+                    echo ""
+                    echo "Docker version:"
                     docker --version
-                    echo "\nBuild version: ${VERSION}"
+                    echo ""
+                    echo "Build version: ${VERSION}"
                     echo "Git commit: ${GIT_COMMIT}"
                 '''
             }
@@ -43,6 +54,11 @@ pipeline {
             steps {
                 echo '🔨 Building Go microservices...'
                 sh '''
+                    # Set Go environment
+                    export PATH=/usr/local/go/bin:$PATH
+                    export GOROOT=/usr/local/go
+                    export GOPATH=${WORKSPACE}/go
+                    
                     echo "Running go mod download..."
                     go mod download
                     
@@ -62,6 +78,7 @@ pipeline {
                     go build -o bin/api-gateway ./api-gateway
                     
                     echo "✅ All services built successfully!"
+                    ls -lh bin/
                 '''
             }
         }
@@ -70,6 +87,10 @@ pipeline {
             steps {
                 echo '🧪 Running tests...'
                 sh '''
+                    export PATH=/usr/local/go/bin:$PATH
+                    export GOROOT=/usr/local/go
+                    export GOPATH=${WORKSPACE}/go
+                    
                     echo "Running Go tests..."
                     go test -v ./... || echo "⚠️  Some tests failed (continuing for demo)"
                     
@@ -87,26 +108,22 @@ pipeline {
                 script {
                     sh """
                         echo "Building user-service image..."
-                        docker build -t ${USER_SERVICE_IMAGE}:${VERSION} -f user-service/Dockerfile .
-                        docker tag ${USER_SERVICE_IMAGE}:${VERSION} ${USER_SERVICE_IMAGE}:latest
+                        docker build -t ${USER_SERVICE_IMAGE}:${VERSION} -t ${USER_SERVICE_IMAGE}:latest -f user-service/Dockerfile .
                         
                         echo "Building product-service image..."
-                        docker build -t ${PRODUCT_SERVICE_IMAGE}:${VERSION} -f product-service/Dockerfile .
-                        docker tag ${PRODUCT_SERVICE_IMAGE}:${VERSION} ${PRODUCT_SERVICE_IMAGE}:latest
+                        docker build -t ${PRODUCT_SERVICE_IMAGE}:${VERSION} -t ${PRODUCT_SERVICE_IMAGE}:latest -f product-service/Dockerfile .
                         
                         echo "Building order-service image..."
-                        docker build -t ${ORDER_SERVICE_IMAGE}:${VERSION} -f order-service/Dockerfile .
-                        docker tag ${ORDER_SERVICE_IMAGE}:${VERSION} ${ORDER_SERVICE_IMAGE}:latest
+                        docker build -t ${ORDER_SERVICE_IMAGE}:${VERSION} -t ${ORDER_SERVICE_IMAGE}:latest -f order-service/Dockerfile .
                         
                         echo "Building notification-service image..."
-                        docker build -t ${NOTIFICATION_SERVICE_IMAGE}:${VERSION} -f notification-service/Dockerfile .
-                        docker tag ${NOTIFICATION_SERVICE_IMAGE}:${VERSION} ${NOTIFICATION_SERVICE_IMAGE}:latest
+                        docker build -t ${NOTIFICATION_SERVICE_IMAGE}:${VERSION} -t ${NOTIFICATION_SERVICE_IMAGE}:latest -f notification-service/Dockerfile .
                         
                         echo "Building api-gateway image..."
-                        docker build -t ${API_GATEWAY_IMAGE}:${VERSION} -f api-gateway/Dockerfile .
-                        docker tag ${API_GATEWAY_IMAGE}:${VERSION} ${API_GATEWAY_IMAGE}:latest
+                        docker build -t ${API_GATEWAY_IMAGE}:${VERSION} -t ${API_GATEWAY_IMAGE}:latest -f api-gateway/Dockerfile .
                         
                         echo "✅ All Docker images built successfully!"
+                        docker images | grep -E "(user-service|product-service|order-service|notification-service|api-gateway)"
                     """
                 }
             }
@@ -114,25 +131,30 @@ pipeline {
         
         stage('Push to Docker Registry') {
             when {
-                branch 'main'  // Only push on main branch
+                branch 'main'
             }
             steps {
                 echo '📤 Pushing images to Docker Hub...'
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', DOCKER_CREDENTIALS_ID) {
                         sh """
+                            echo "Pushing user-service..."
                             docker push ${USER_SERVICE_IMAGE}:${VERSION}
                             docker push ${USER_SERVICE_IMAGE}:latest
                             
+                            echo "Pushing product-service..."
                             docker push ${PRODUCT_SERVICE_IMAGE}:${VERSION}
                             docker push ${PRODUCT_SERVICE_IMAGE}:latest
                             
+                            echo "Pushing order-service..."
                             docker push ${ORDER_SERVICE_IMAGE}:${VERSION}
                             docker push ${ORDER_SERVICE_IMAGE}:latest
                             
+                            echo "Pushing notification-service..."
                             docker push ${NOTIFICATION_SERVICE_IMAGE}:${VERSION}
                             docker push ${NOTIFICATION_SERVICE_IMAGE}:latest
                             
+                            echo "Pushing api-gateway..."
                             docker push ${API_GATEWAY_IMAGE}:${VERSION}
                             docker push ${API_GATEWAY_IMAGE}:latest
                             
@@ -150,12 +172,6 @@ pipeline {
             steps {
                 echo '🚀 Deploying to staging environment...'
                 sh '''
-                    echo "Deployment would happen here..."
-                    echo "In production, this would:"
-                    echo "  - SSH to staging server"
-                    echo "  - Pull new images"
-                    echo "  - Run docker-compose up with new versions"
-                    echo "  - Run smoke tests"
                     echo "✅ Staging deployment simulated!"
                 '''
             }
@@ -166,8 +182,9 @@ pipeline {
                 branch 'main'
             }
             steps {
-                echo '⏸️  Waiting for manual approval to deploy to production...'
-                input message: 'Deploy to Production?', ok: 'Deploy'
+                timeout(time: 5, unit: 'MINUTES') {
+                    input message: 'Deploy to Production?', ok: 'Deploy'
+                }
             }
         }
         
@@ -178,7 +195,6 @@ pipeline {
             steps {
                 echo '🚀 Deploying to production environment...'
                 sh '''
-                    echo "Production deployment would happen here..."
                     echo "✅ Production deployment simulated!"
                 '''
             }
@@ -188,13 +204,15 @@ pipeline {
     post {
         success {
             echo '✅ Pipeline completed successfully!'
+            echo "Docker images pushed with version: ${VERSION}"
         }
         failure {
             echo '❌ Pipeline failed!'
+            echo 'Check console output for details'
         }
-        cleanup {
-            echo '🧹 Cleaning up...'
-            sh 'docker system prune -f || true'
+        always {
+            echo '🧹 Cleaning up workspace...'
+            cleanWs()
         }
     }
 }

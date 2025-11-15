@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors" // ADD THIS LINE
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 

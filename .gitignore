@@ -13,7 +13,6 @@
 *.out
 
 # Go build cache and modules
-/go.sum
 /go.work
 /go.work.sum
 

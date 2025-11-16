@@ -205,9 +205,7 @@ pipeline {
         }
         
         stage('Deploy to Staging') {
-            when {
-                branch pattern: ".*main", comparator: "REGEXP"
-            }
+            
             steps {
                 echo '🚀 Deploying to staging environment...'
                 sh '''
@@ -224,9 +222,7 @@ pipeline {
         }
         
         stage('Approve Production Deploy') {
-            when {
-                branch pattern: ".*main", comparator: "REGEXP"
-            }
+            
             steps {
                 echo '⏸️ Waiting for manual approval to deploy to production...'
                 timeout(time: 1, unit: 'HOURS') {
@@ -236,9 +232,7 @@ pipeline {
         }
         
         stage('Deploy to Production') {
-            when {
-                branch pattern: ".*main", comparator: "REGEXP"
-            }
+            
             steps {
                 echo '🚀 Deploying to production environment...'
                 sh '''

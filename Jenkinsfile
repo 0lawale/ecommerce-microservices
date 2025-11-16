@@ -170,7 +170,7 @@ pipeline {
         
         stage('Push to Docker Registry') {
             when {
-                branch 'main'
+                branch pattern: ".*main", comparator: "REGEXP"
             }
             steps {
                 echo '📤 Pushing images to Docker Hub...'
@@ -206,7 +206,7 @@ pipeline {
         
         stage('Deploy to Staging') {
             when {
-                branch 'main'
+                branch pattern: ".*main", comparator: "REGEXP"
             }
             steps {
                 echo '🚀 Deploying to staging environment...'
@@ -225,7 +225,7 @@ pipeline {
         
         stage('Approve Production Deploy') {
             when {
-                branch 'main'
+                branch pattern: ".*main", comparator: "REGEXP"
             }
             steps {
                 echo '⏸️ Waiting for manual approval to deploy to production...'
@@ -237,7 +237,7 @@ pipeline {
         
         stage('Deploy to Production') {
             when {
-                branch 'main'
+                branch pattern: ".*main", comparator: "REGEXP"
             }
             steps {
                 echo '🚀 Deploying to production environment...'

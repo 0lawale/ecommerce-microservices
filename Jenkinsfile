@@ -169,9 +169,7 @@ pipeline {
         }
         
         stage('Push to Docker Registry') {
-            when {
-                branch pattern: ".*main", comparator: "REGEXP"
-            }
+            
             steps {
                 echo '📤 Pushing images to Docker Hub...'
                 script {

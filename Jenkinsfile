@@ -6,12 +6,14 @@ pipeline {
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
         
-        // Image names (replace with your Docker Hub username)
-        USER_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/user-service"
-        PRODUCT_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/product-service"
-        ORDER_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/order-service"
-        NOTIFICATION_SERVICE_IMAGE = "${DOCKER_REGISTRY}/0lawale/notification-service"
-        API_GATEWAY_IMAGE = "${DOCKER_REGISTRY}/0lawale/api-gateway"
+        DOCKER_USERNAME = '0lawale'
+        
+        // Image names
+        USER_SERVICE_IMAGE = "${DOCKER_REGISTRY}/${DOCKER_USERNAME}/user-service"
+        PRODUCT_SERVICE_IMAGE = "${DOCKER_REGISTRY}/${DOCKER_USERNAME}/product-service"
+        ORDER_SERVICE_IMAGE = "${DOCKER_REGISTRY}/${DOCKER_USERNAME}/order-service"
+        NOTIFICATION_SERVICE_IMAGE = "${DOCKER_REGISTRY}/${DOCKER_USERNAME}/notification-service"
+        API_GATEWAY_IMAGE = "${DOCKER_REGISTRY}/${DOCKER_USERNAME}/api-gateway"
         
         // Build version
         VERSION = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
@@ -22,6 +24,8 @@ pipeline {
             steps {
                 echo '📥 Checking out code from GitHub...'
                 checkout scm
+                sh 'ls -la'
+                sh 'cat go.mod | head -n 5'
             }
         }
         
@@ -29,60 +33,89 @@ pipeline {
             steps {
                 echo '🔍 Environment Information:'
                 sh '''
-                    # Set Go paths explicitly
-                    export PATH=/usr/local/go/bin:/usr/bin:$PATH
-                    export GOROOT=/usr/local/go
-                    export GOPATH=${WORKSPACE}/go
+                    echo "Current directory:"
+                    pwd
                     
-                    echo "PATH: $PATH"
-                    echo "GOROOT: $GOROOT"
-                    echo "GOPATH: $GOPATH"
-                    echo ""
-                    echo "Go version:"
+                    echo "\nGo version:"
                     go version
-                    echo ""
-                    echo "Docker version:"
+                    
+                    echo "\nDocker version:"
                     docker --version
-                    echo ""
-                    echo "Build version: ${VERSION}"
+                    
+                    echo "\nProject structure:"
+                    ls -la
+                    
+                    echo "\nChecking go.mod:"
+                    cat go.mod
+                    
+                    echo "\nBuild version: ${VERSION}"
                     echo "Git commit: ${GIT_COMMIT}"
+                '''
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                echo '📦 Installing Go dependencies...'
+                sh '''
+                    # Ensure we're in the root directory
+                    pwd
+                    
+                    # Clean any previous builds
+                    rm -rf bin/ || true
+                    mkdir -p bin
+                    
+                    # Download dependencies (mono-repo style)
+                    echo "Running go mod download..."
+                    go mod download
+                    
+                    # Verify dependencies
+                    echo "Running go mod tidy..."
+                    go mod tidy
+                    
+                    # Verify go.sum exists
+                    if [ -f go.sum ]; then
+                        echo "✅ go.sum exists"
+                        wc -l go.sum
+                    else
+                        echo "⚠️  go.sum not found, creating it..."
+                        go mod tidy
+                    fi
+                    
+                    echo "✅ Dependencies installed successfully!"
                 '''
             }
         }
         
         stage('Build Go Services') {
             steps {
-                echo '🔨 Building Go microservices...'
+                echo '🔨 Building Go microservices (mono-repo)...'
                 sh '''
-                    # Set Go environment
-                    export PATH=/usr/local/go/bin:$PATH
-                    export GOROOT=/usr/local/go
-                    export GOPATH=${WORKSPACE}/go
-                    
-                    echo "Running go mod download..."
-                    go mod download
+                    # We're building from the ROOT directory using the root go.mod
+                    # All imports are: ecommerce/service-name/...
                     
                     echo "Building user-service..."
-                    go mod tidy
-                    go build -o bin/user-service ./user-service
+                    go build -v -o bin/user-service ./user-service
+                    ls -lh bin/user-service
                     
                     echo "Building product-service..."
-                    go mod tidy
-                    go build -o bin/product-service ./product-service
+                    go build -v -o bin/product-service ./product-service
+                    ls -lh bin/product-service
                     
                     echo "Building order-service..."
-                    go mod tidy
-                    go build -o bin/order-service ./order-service
+                    go build -v -o bin/order-service ./order-service
+                    ls -lh bin/order-service
                     
                     echo "Building notification-service..."
-                    go mod tidy
-                    go build -o bin/notification-service ./notification-service
+                    go build -v -o bin/notification-service ./notification-service
+                    ls -lh bin/notification-service
                     
                     echo "Building api-gateway..."
-                    go mod tidy
-                    go build -o bin/api-gateway ./api-gateway
+                    go build -v -o bin/api-gateway ./api-gateway
+                    ls -lh bin/api-gateway
                     
-                    echo "✅ All services built successfully!"
+                    echo "\n✅ All services built successfully!"
+                    echo "Built binaries:"
                     ls -lh bin/
                 '''
             }
@@ -92,15 +125,15 @@ pipeline {
             steps {
                 echo '🧪 Running tests...'
                 sh '''
-                    export PATH=/usr/local/go/bin:$PATH
-                    export GOROOT=/usr/local/go
-                    export GOPATH=${WORKSPACE}/go
+                    echo "Running Go tests from root..."
+                    # Run tests for all packages
+                    go test ./... -v -cover || echo "⚠️ Some tests failed (continuing for demo)"
                     
-                    echo "Running Go tests..."
-                    go test -v ./... || echo "⚠️  Some tests failed (continuing for demo)"
-                    
-                    echo "Running linter..."
+                    echo "\nRunning go fmt..."
                     go fmt ./... || true
+                    
+                    echo "\nRunning go vet..."
+                    go vet ./... || echo "⚠️ go vet found issues (continuing)"
                     
                     echo "✅ Tests completed!"
                 '''
@@ -111,6 +144,7 @@ pipeline {
             steps {
                 echo '🐳 Building Docker images...'
                 script {
+                    // Build from root context since Dockerfiles copy from root
                     sh """
                         echo "Building user-service image..."
                         docker build -t ${USER_SERVICE_IMAGE}:${VERSION} -t ${USER_SERVICE_IMAGE}:latest -f user-service/Dockerfile .
@@ -127,8 +161,8 @@ pipeline {
                         echo "Building api-gateway image..."
                         docker build -t ${API_GATEWAY_IMAGE}:${VERSION} -t ${API_GATEWAY_IMAGE}:latest -f api-gateway/Dockerfile .
                         
-                        echo "✅ All Docker images built successfully!"
-                        docker images | grep -E "(user-service|product-service|order-service|notification-service|api-gateway)"
+                        echo "\n✅ All Docker images built successfully!"
+                        docker images | grep ${DOCKER_USERNAME}
                     """
                 }
             }
@@ -163,7 +197,7 @@ pipeline {
                             docker push ${API_GATEWAY_IMAGE}:${VERSION}
                             docker push ${API_GATEWAY_IMAGE}:latest
                             
-                            echo "✅ All images pushed successfully!"
+                            echo "\n✅ All images pushed to Docker Hub!"
                         """
                     }
                 }
@@ -177,6 +211,13 @@ pipeline {
             steps {
                 echo '🚀 Deploying to staging environment...'
                 sh '''
+                    echo "Deployment would happen here..."
+                    echo "In production, this would:"
+                    echo "  - SSH to staging server"
+                    echo "  - Pull new images: docker pull ${USER_SERVICE_IMAGE}:${VERSION}"
+                    echo "  - Update docker-compose.yml with new version"
+                    echo "  - Run: docker-compose up -d"
+                    echo "  - Run smoke tests"
                     echo "✅ Staging deployment simulated!"
                 '''
             }
@@ -187,7 +228,8 @@ pipeline {
                 branch 'main'
             }
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                echo '⏸️ Waiting for manual approval to deploy to production...'
+                timeout(time: 1, unit: 'HOURS') {
                     input message: 'Deploy to Production?', ok: 'Deploy'
                 }
             }
@@ -200,6 +242,8 @@ pipeline {
             steps {
                 echo '🚀 Deploying to production environment...'
                 sh '''
+                    echo "Production deployment would happen here..."
+                    echo "Steps would be similar to staging but with production servers"
                     echo "✅ Production deployment simulated!"
                 '''
             }
@@ -209,15 +253,20 @@ pipeline {
     post {
         success {
             echo '✅ Pipeline completed successfully!'
-            echo "Docker images pushed with version: ${VERSION}"
+            echo "Docker images available at:"
+            echo "  - ${USER_SERVICE_IMAGE}:${VERSION}"
+            echo "  - ${PRODUCT_SERVICE_IMAGE}:${VERSION}"
+            echo "  - ${ORDER_SERVICE_IMAGE}:${VERSION}"
+            echo "  - ${NOTIFICATION_SERVICE_IMAGE}:${VERSION}"
+            echo "  - ${API_GATEWAY_IMAGE}:${VERSION}"
         }
         failure {
             echo '❌ Pipeline failed!'
-            echo 'Check console output for details'
+            echo 'Check the console output above for errors'
         }
         always {
             echo '🧹 Cleaning up workspace...'
-            cleanWs()
+            sh 'docker system prune -f || true'
         }
     }
 }

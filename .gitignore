@@ -64,3 +64,34 @@ coverage/
 /output/
 /tmp/
 /jenkins
+
+# terraform state and secret files
+
+# Terraform directories
+.terraform/
+.terraform.tfstate
+.terraform.tfstate.backup
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfstate.d/
+
+# Terraform lock and crash logs
+.terraform.lock.hcl
+crash.log
+
+# Variable files (to avoid committing secrets or credentials)
+*.tfvars
+*.tfvars.json
+dev.tfvars
+
+# Local overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Misc
+*.log
+*.bak
+*.tmp
+

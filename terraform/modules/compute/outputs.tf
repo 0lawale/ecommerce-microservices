@@ -1,11 +1,21 @@
-output "instance_ids" {
-  description = "EC2 instance IDs"
-  value       = aws_instance.app_server[*].id
+output "k3s_master_private_ip" {
+  description = "Private IP of k3s master node"
+  value       = aws_instance.k3s_master[0].private_ip
 }
 
-output "instance_private_ips" {
-  description = "Private IP addresses of EC2 instances"
-  value       = aws_instance.app_server[*].private_ip
+output "k3s_master_id" {
+  description = "Instance ID of k3s master"
+  value       = aws_instance.k3s_master[0].id
+}
+
+output "k3s_worker_private_ips" {
+  description = "Private IPs of k3s worker nodes"
+  value       = aws_instance.k3s_workers[*].private_ip
+}
+
+output "k3s_worker_ids" {
+  description = "Instance IDs of k3s workers"
+  value       = aws_instance.k3s_workers[*].id
 }
 
 output "alb_dns_name" {
@@ -13,12 +23,12 @@ output "alb_dns_name" {
   value       = aws_lb.main.dns_name
 }
 
-output "alb_zone_id" {
-  description = "Zone ID of the Application Load Balancer"
-  value       = aws_lb.main.zone_id
+output "alb_arn" {
+  description = "ARN of the Application Load Balancer"
+  value       = aws_lb.main.arn
 }
 
-output "target_group_arn" {
-  description = "ARN of the target group"
+output "alb_target_group_arn" {
+  description = "ARN of the ALB target group"
   value       = aws_lb_target_group.app.arn
 }

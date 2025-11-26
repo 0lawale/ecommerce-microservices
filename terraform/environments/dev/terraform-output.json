@@ -1,0 +1,118 @@
+{
+  "alb_dns_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ecommerce-dev-alb-1785921593.us-east-1.elb.amazonaws.com"
+  },
+  "connect_to_master": {
+    "sensitive": false,
+    "type": "string",
+    "value": "aws ssm start-session --target i-0e88b3fca741998ec"
+  },
+  "database_backups_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ecommerce-dev-db-backups"
+  },
+  "jenkins_artifacts_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ecommerce-dev-jenkins-artifacts"
+  },
+  "k3s_master_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "i-0e88b3fca741998ec"
+  },
+  "k3s_master_private_ip": {
+    "sensitive": false,
+    "type": "string",
+    "value": "10.0.11.7"
+  },
+  "k3s_worker_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "i-0f1b67a2cc9cc537a",
+      "i-0abcf95c6cedd0fb7"
+    ]
+  },
+  "k3s_worker_private_ips": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "10.0.11.174",
+      "10.0.12.87"
+    ]
+  },
+  "kubeconfig_command": {
+    "sensitive": false,
+    "type": "string",
+    "value": "aws ssm start-session --target i-0e88b3fca741998ec --document-name AWS-StartInteractiveCommand --parameters command='sudo cat /etc/rancher/k3s/k3s.yaml'"
+  },
+  "logs_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ecommerce-dev-logs"
+  },
+  "private_subnet_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-09a98e670f0a15cc4",
+      "subnet-04dc79c18e5231d5c"
+    ]
+  },
+  "public_subnet_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-0d829a12b49948240",
+      "subnet-0f86e89fed0f2a691"
+    ]
+  },
+  "rds_database_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ecommerce"
+  },
+  "rds_endpoint": {
+    "sensitive": true,
+    "type": "string",
+    "value": "ecommerce-dev-postgres.cs7kqo48k7pw.us-east-1.rds.amazonaws.com:5432"
+  },
+  "redis_endpoint": {
+    "sensitive": true,
+    "type": "string",
+    "value": "ecommerce-dev-redis.sq5rxr.0001.use1.cache.amazonaws.com"
+  },
+  "vpc_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "vpc-00889d6cd8645e3f8"
+  }
+}

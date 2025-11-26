@@ -26,7 +26,7 @@ variable "redis_security_group_id" {
 variable "db_instance_class" {
   description = "RDS instance class"
   type        = string
-  default     = "db.t3.micro"  # Free tier eligible
+  default     = "db.t3.micro" # Free tier eligible
 }
 
 variable "db_allocated_storage" {
@@ -56,5 +56,5 @@ variable "db_password" {
 variable "redis_node_type" {
   description = "ElastiCache node type"
   type        = string
-  default     = "cache.t3.micro"  # Free tier eligible
+  default     = "cache.t3.micro" # Free tier eligible
 }

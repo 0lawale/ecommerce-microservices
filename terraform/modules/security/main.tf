@@ -1,4 +1,4 @@
-# Security Groups Module
+# Security Groups Module - k3s Ready
 
 # ALB Security Group (allows HTTP/HTTPS from internet)
 resource "aws_security_group" "alb" {
@@ -35,17 +35,25 @@ resource "aws_security_group" "alb" {
   }
 }
 
-# Application Servers Security Group
+# Application Servers Security Group (k3s nodes)
 resource "aws_security_group" "app" {
   name        = "${var.project_name}-app-sg"
-  description = "Security group for application servers"
+  description = "Security group for k3s cluster nodes"
   vpc_id      = var.vpc_id
 
-  # Allow traffic from ALB on app ports
+  # Allow traffic from ALB
   ingress {
     description     = "HTTP from ALB"
-    from_port       = 8080
-    to_port         = 8084
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "HTTPS from ALB"
+    from_port       = 443
+    to_port         = 443
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -57,6 +65,60 @@ resource "aws_security_group" "app" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = var.allowed_ssh_cidrs
+  }
+
+  # k3s API Server (for kubectl)
+  ingress {
+    description = "k3s API Server"
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    self        = true
+  }
+
+  # k3s metrics and health
+  ingress {
+    description = "k3s metrics"
+    from_port   = 10250
+    to_port     = 10250
+    protocol    = "tcp"
+    self        = true
+  }
+
+  # Flannel VXLAN (k3s default CNI)
+  ingress {
+    description = "Flannel VXLAN"
+    from_port   = 8472
+    to_port     = 8472
+    protocol    = "udp"
+    self        = true
+  }
+
+  # k3s embedded etcd (if using HA)
+  ingress {
+    description = "etcd client"
+    from_port   = 2379
+    to_port     = 2380
+    protocol    = "tcp"
+    self        = true
+  }
+
+  # NodePort Services (30000-32767)
+  ingress {
+    description = "k3s NodePort range"
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    self        = true
+  }
+
+  # Allow all traffic between cluster nodes
+  ingress {
+    description = "All traffic from cluster nodes"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
   }
 
   # Allow all outbound traffic

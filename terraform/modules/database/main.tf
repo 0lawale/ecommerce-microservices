@@ -16,12 +16,12 @@ resource "aws_db_instance" "postgres" {
   identifier = "${var.project_name}-${var.environment}-postgres"
 
   # Engine configuration
-  engine               = "postgres"
-  engine_version       = "15.15"
-  instance_class       = var.db_instance_class
-  allocated_storage    = var.db_allocated_storage
-  storage_type         = "gp3"
-  storage_encrypted    = true
+  engine            = "postgres"
+  engine_version    = "15.15"
+  instance_class    = var.db_instance_class
+  allocated_storage = var.db_allocated_storage
+  storage_type      = "gp3"
+  storage_encrypted = true
 
   # Database configuration
   db_name  = var.db_name

@@ -1,4 +1,4 @@
-# Compute Module - EC2 Instances
+# Compute Module - EC2 Instances for k3s
 
 # Get latest Amazon Linux 2023 AMI
 data "aws_ami" "amazon_linux" {
@@ -27,7 +27,7 @@ resource "aws_key_pair" "main" {
   }
 }
 
-# IAM Role for EC2 (allows pulling from ECR, etc.)
+# IAM Role for EC2
 resource "aws_iam_role" "ec2_role" {
   name = "${var.project_name}-${var.environment}-ec2-role"
 
@@ -61,7 +61,7 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Attach S3 access policy to EC2 role
+# Attach S3 access policy
 resource "aws_iam_role_policy_attachment" "s3_access" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = var.s3_access_policy_arn
@@ -73,7 +73,7 @@ resource "aws_iam_instance_profile" "main" {
   role = aws_iam_role.ec2_role.name
 }
 
-# User data script to install Docker and run services
+# User data script - Prepare instances for k3s
 locals {
   user_data = <<-EOF
     #!/bin/bash
@@ -82,32 +82,61 @@ locals {
     # Update system
     yum update -y
     
-    # Install Docker
-    yum install -y docker
-    systemctl start docker
-    systemctl enable docker
+    # Install required packages for k3s
+    yum install -y curl wget git
     
-    # Install Docker Compose
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
+    # Disable firewalld (k3s will manage iptables)
+    systemctl stop firewalld
+    systemctl disable firewalld
     
-    # Add ec2-user to docker group
-    usermod -aG docker ec2-user
+    # Enable IP forwarding (required for k3s)
+    cat <<EOT >> /etc/sysctl.conf
+net.ipv4.ip_forward = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+EOT
+    sysctl -p
     
-    # Create app directory
-    mkdir -p /app
-    cd /app
+    # Create directory for k3s
+    mkdir -p /etc/rancher/k3s
     
     # Log completion
-    echo "EC2 instance setup completed at $(date)" >> /var/log/user-data.log
+    echo "Instance prepared for k3s at $(date)" >> /var/log/user-data.log
     
-    # The actual application deployment will be done by Ansible or CI/CD
+    # k3s will be installed by Ansible
   EOF
 }
 
-# Application Server EC2 Instance
-resource "aws_instance" "app_server" {
-  count                  = var.instance_count
+# K3s Master Node (first instance)
+resource "aws_instance" "k3s_master" {
+  count                  = 1
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = var.instance_type
+  key_name               = aws_key_pair.main.key_name
+  subnet_id              = var.private_subnet_ids[0]
+  vpc_security_group_ids = [var.app_security_group_id]
+  iam_instance_profile   = aws_iam_instance_profile.main.name
+
+  user_data = local.user_data
+
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = var.root_volume_size
+    delete_on_termination = true
+    encrypted             = true
+  }
+
+  tags = {
+    Name        = "${var.project_name}-k3s-master"
+    Environment = var.environment
+    Role        = "k3s-master"
+    K3sRole     = "master" # Used by Ansible
+  }
+}
+
+# K3s Worker Nodes
+resource "aws_instance" "k3s_workers" {
+  count                  = var.instance_count - 1 # Subtract 1 for master
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   key_name               = aws_key_pair.main.key_name
@@ -125,9 +154,10 @@ resource "aws_instance" "app_server" {
   }
 
   tags = {
-    Name        = "${var.project_name}-app-server-${count.index + 1}"
+    Name        = "${var.project_name}-k3s-worker-${count.index + 1}"
     Environment = var.environment
-    Role        = "application"
+    Role        = "k3s-worker"
+    K3sRole     = "worker" # Used by Ansible
   }
 }
 
@@ -147,10 +177,10 @@ resource "aws_lb" "main" {
   }
 }
 
-# ALB Target Group
+# ALB Target Group (for k3s ingress controller)
 resource "aws_lb_target_group" "app" {
   name     = "${var.project_name}-${var.environment}-tg"
-  port     = 8080
+  port     = 80
   protocol = "HTTP"
   vpc_id   = var.vpc_id
 
@@ -158,8 +188,8 @@ resource "aws_lb_target_group" "app" {
     enabled             = true
     healthy_threshold   = 2
     interval            = 30
-    matcher             = "200"
-    path                = "/health"
+    matcher             = "200,404" # 404 is OK if no ingress is configured yet
+    path                = "/"
     port                = "traffic-port"
     protocol            = "HTTP"
     timeout             = 5
@@ -172,12 +202,19 @@ resource "aws_lb_target_group" "app" {
   }
 }
 
-# Register instances with target group
-resource "aws_lb_target_group_attachment" "app" {
-  count            = var.instance_count
+# Register master with target group (k3s will run ingress controller here)
+resource "aws_lb_target_group_attachment" "master" {
   target_group_arn = aws_lb_target_group.app.arn
-  target_id        = aws_instance.app_server[count.index].id
-  port             = 8080
+  target_id        = aws_instance.k3s_master[0].id
+  port             = 80
+}
+
+# Register workers with target group
+resource "aws_lb_target_group_attachment" "workers" {
+  count            = var.instance_count - 1
+  target_group_arn = aws_lb_target_group.app.arn
+  target_id        = aws_instance.k3s_workers[count.index].id
+  port             = 80
 }
 
 # ALB Listener (HTTP)

@@ -123,6 +123,6 @@ variable "log_retention_days" {
 
 variable "root_volume_size" {
   description = "Root volumes of my ec2 instance"
-  type = number
-  default = 30
+  type        = number
+  default     = 30
 }

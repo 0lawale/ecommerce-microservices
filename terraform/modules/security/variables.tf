@@ -16,5 +16,5 @@ variable "vpc_id" {
 variable "allowed_ssh_cidrs" {
   description = "CIDR blocks allowed to SSH"
   type        = list(string)
-  default     = ["0.0.0.0/0"]  # In production, restrict this to your IP
+  default     = ["0.0.0.0/0"] # In production, restrict this to your IP
 }
